@@ -2,7 +2,6 @@ from typing import overload
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from Pdfextract import extract_text_from_pdf
 
 checkpoint = "Qwen/Qwen2.5-1.5B-Instruct"
 
@@ -69,8 +68,7 @@ class BaseLLM:
     def answer(self, *questions) -> list[float]:
       pass
 
-def answer(pdf_path):
-  text = extract_text_from_pdf(pdf_path)
+def answer():
   model = BaseLLM()
   prompt = model.format_prompt(text[:16])
   #print(prompt)
