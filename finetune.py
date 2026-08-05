@@ -1,5 +1,6 @@
-from .base_llm import BaseLLM
-from .data import Dataset, benchmark
+from torch.nnn.functional import cosine_similarity
+from base_llm import BaseLLM
+from fin_data import Dataset, benchmark
 from transformers import Trainer
 from transformers.training_args import TrainingArguments
 
@@ -8,7 +9,7 @@ def load() -> BaseLLM:
 
     from peft import PeftModel
 
-    model_name = "sft_model"
+    model_name = "finny"
     model_path = Path(__file__).parent / model_name
 
     llm = BaseLLM()
@@ -18,7 +19,7 @@ def load() -> BaseLLM:
     return llm
 
 
-def tokenize(tokenizer, question: str, answer: str):
+def tokenize(tokenizer, query: str, answer: str):
     """
     Tokenize a data element.
     We first append the <EOS> token to the question / answer pair.
@@ -26,17 +27,17 @@ def tokenize(tokenizer, question: str, answer: str):
     `labels[i] == -100` for the question or masked out parts, since we only want to supervise
     the answer.
     """
-    full_text = f"{question} {answer}{tokenizer.eos_token}"
+    full_text = f"{query} {answer}{tokenizer.eos_token}"
 
     tokenizer.padding_side = "right"
     tokenizer.pad_token = tokenizer.eos_token
     full = tokenizer(full_text, padding="max_length", truncation=True, max_length=128)
 
     input_ids = full["input_ids"]
-    question_len = len(tokenizer(question)["input_ids"])
+    query_len = len(tokenizer(query)["input_ids"])
 
     # Create labels: mask out the prompt part
-    labels = [-100] * question_len + input_ids[question_len:]
+    labels = [-100] * query_len + input_ids[query_len:]
 
     for i in range(len(labels)):
         if full["attention_mask"][i] == 0:
@@ -48,10 +49,10 @@ def tokenize(tokenizer, question: str, answer: str):
 
 def format_example(prompt: str, answer: str) -> dict[str, str]:
     """
-    Construct a question / answer pair. Consider rounding the answer to make it easier for the LLM.
+    Construct a query / answer pair. Consider rounding the answer to make it easier for the LLM.
     """
     
-    return {"question":prompt, "answer":f"<answer>{round(float(answer),3)}</answer>"}
+    return {"query":prompt, "answer":answer}
 
 
 class TokenizedDataset:
@@ -61,7 +62,7 @@ class TokenizedDataset:
         - BaseLLM.tokenizer
         - Dataset
         - format_fn which converts a data element into a dict with entries
-          - question: str
+          - query: str
           - answer: str
         """
         self.format_fn = format_fn
@@ -104,9 +105,10 @@ def test_model(ckpt_path: str):
     from peft import PeftModel
 
     llm.model = PeftModel.from_pretrained(llm.model, ckpt_path).to(llm.device)
-
-    benchmark_result = benchmark(llm, testset, 100)
-    print(f"{benchmark_result.accuracy=}  {benchmark_result.answer_rate=}")
+    base= llm.tokenizer(testset['response'])
+    check = llm.tokenizer(llm.model.batched_generate(testset['query']))
+    similarity = cosine_similarity(base, check, dim=1)
+    print(f"{similarity}")
 
 
 if __name__ == "__main__":

@@ -2,8 +2,9 @@ from typing import overload
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from fin_data import load_data
 
-checkpoint = "Qwen/Qwen2.5-1.5B-Instruct"
+checkpoint = "Qwen/Qwen2.5-0.5B-Instruct"
 
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
@@ -60,7 +61,7 @@ class BaseLLM:
           num_return_sequences=1
         if temperature > 0:
            sample = True
-           output = self.model.generate(**tokens, max_new_tokens=125, temperature=temperature, do_sample=sample, num_return_sequences=num_return_sequences, eos_token_id=self.tokenizer.eos_token_id)
+           output = self.model.generate(**tokens, max_new_tokens=512, temperature=temperature, do_sample=sample, num_return_sequences=num_return_sequences, eos_token_id=self.tokenizer.eos_token_id)
         else:
           output = self.model.generate(**tokens, max_new_tokens=512, num_return_sequences=num_return_sequences, eos_token_id=self.tokenizer.eos_token_id)
         return self.tokenizer.batch_decode(output[:, len(tokens["input_ids"][0]) :])
@@ -76,10 +77,13 @@ def answer():
   print("Response:", answer)
 
 def test_model():
-    test = "Briefly state what is finance"
+    dataset = load_data()
+    queries = dataset['train']['query'][:5]
     model = BaseLLM()
-    answer = model.generate(test)
-    print("output", answer)
+    answer = model.batched_generate(queries)
+    for idx, query in enumerate(queries):
+      print("Input:\n", query)
+      print("Output:\n", answer[idx])
 
 
 if __name__ == "__main__":
