@@ -6,18 +6,16 @@ from datasets.splits import dataclasses
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
-def load_data():
-  return load_dataset("Akhil-Theerthala/Kuvera-PersonalFinance-V2.1")['train']
+def load_data(split):
+  return load_dataset("Akhil-Theerthala/Kuvera-PersonalFinance-V2.1", split=f"train[{split}]")
 
 
 class Dataset:
     def __init__(self, split: str):
-        data = load_data().select_columns(['query','response'])
         if split=='train':
-          data = data[:1000]
+          self.data = load_data(":1000").select_columns(['query','response'])
         else:
-          data = data[1000:1100]
-        self.data = data
+          self.data = load_data("1000:1100").select_columns(['query','response'])
 
     def __len__(self):
         return len(self.data)

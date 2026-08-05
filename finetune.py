@@ -1,6 +1,6 @@
-from torch.nnn.functional import cosine_similarity
+from torch.nn.functional import cosine_similarity
 from base_llm import BaseLLM
-from fin_data import Dataset, benchmark
+from fin_data import Dataset
 from transformers import Trainer
 from transformers.training_args import TrainingArguments
 
@@ -88,10 +88,10 @@ def train_model(
     model.enable_input_require_grads()
     epochs = kwargs.get("epoch", 5)
     batch = kwargs.get("batch", 32)
-    args = TrainingArguments(output_dir=output_dir, logging_dir=output_dir, report_to="tensorboard", gradient_checkpointing=True, learning_rate=1e-3, num_train_epochs=epochs, per_device_train_batch_size=batch)
+    args = TrainingArguments(output_dir=output_dir, logging_dir=output_dir, report_to="tensorboard", gradient_checkpointing=True, learning_rate=1e-3, num_train_epochs=epochs, per_device_train_batch_size=batch, per_device_eval_batch_size=batch, eval_strategy="steps", eval_steps=50)
     t_dataset = TokenizedDataset(llm.tokenizer, Dataset("train"), format_example)
-   # v_dataset = TokenizedDataset(llm.tokenizer, Dataset("valid"), format_example)
-    training = Trainer(model,args,train_dataset=t_dataset)
+    v_dataset = TokenizedDataset(llm.tokenizer, Dataset("valid"), format_example)
+    training = Trainer(model,args,train_dataset=t_dataset, eval_dataset=v_dataset)
     training.train()
     training.save_model(output_dir)
     test_model(output_dir)
@@ -105,10 +105,11 @@ def test_model(ckpt_path: str):
     from peft import PeftModel
 
     llm.model = PeftModel.from_pretrained(llm.model, ckpt_path).to(llm.device)
-    base= llm.tokenizer(testset['response'])
-    check = llm.tokenizer(llm.model.batched_generate(testset['query']))
-    similarity = cosine_similarity(base, check, dim=1)
-    print(f"{similarity}")
+    print("Query:\n",testset['query'][0])
+    base= testset['response'][0]
+    print("True response:\n",base)
+    check = llm.generate(testset['query'][0])
+    print("My response:\n",check)
 
 
 if __name__ == "__main__":
