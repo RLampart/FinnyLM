@@ -28,11 +28,9 @@ def tokenize(tokenizer, query: str, answer: str):
     the answer.
     """
     full_text = f"{query} {answer}{tokenizer.eos_token}"
-
     tokenizer.padding_side = "right"
     tokenizer.pad_token = tokenizer.eos_token
-    full = tokenizer(full_text, padding="max_length", truncation=True, max_length=128)
-
+    full = tokenizer(full_text, padding="max_length", truncation=True, max_length=512)
     input_ids = full["input_ids"]
     query_len = len(tokenizer(query)["input_ids"])
 
@@ -44,6 +42,7 @@ def tokenize(tokenizer, query: str, answer: str):
             labels[i] = -100
 
     full["labels"] = labels
+
     return full
 
 
@@ -87,7 +86,7 @@ def train_model(
     model = get_peft_model(llm.model, config)
     model.enable_input_require_grads()
     epochs = kwargs.get("epoch", 5)
-    batch = kwargs.get("batch", 32)
+    batch = kwargs.get("batch", 8)
     args = TrainingArguments(output_dir=output_dir, logging_dir=output_dir, report_to="tensorboard", gradient_checkpointing=True, learning_rate=1e-3, num_train_epochs=epochs, per_device_train_batch_size=batch, per_device_eval_batch_size=batch, eval_strategy="steps", eval_steps=50)
     t_dataset = TokenizedDataset(llm.tokenizer, Dataset("train"), format_example)
     v_dataset = TokenizedDataset(llm.tokenizer, Dataset("valid"), format_example)
@@ -110,6 +109,7 @@ def test_model(ckpt_path: str):
     print("True response:\n",base)
     check = llm.generate(testset['query'][0])
     print("My response:\n",check)
+
 
 
 if __name__ == "__main__":
