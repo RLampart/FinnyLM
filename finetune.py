@@ -29,7 +29,7 @@ def tokenize(tokenizer, query: str, answer: str):
     """
     full_text = f"{query} {answer}{tokenizer.eos_token}"
     tokenizer.padding_side = "right"
-    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.pad_token = "<|vision_pad|>"
     full = tokenizer(full_text, padding="max_length", truncation=True, max_length=1024)
     input_ids = full["input_ids"]
     query_len = len(tokenizer(query)["input_ids"])
@@ -42,7 +42,6 @@ def tokenize(tokenizer, query: str, answer: str):
             labels[i] = -100
 
     full["labels"] = labels
-
     return full
 
 
@@ -81,13 +80,13 @@ def train_model(
     **kwargs,
 ):
     from peft import get_peft_model, LoraConfig
-    config = LoraConfig(r=16, lora_alpha=64, target_modules="all-linear", bias="none", task_type="CAUSAL_LM")
+    config = LoraConfig(r=8, lora_alpha=16, target_modules="all-linear", bias="none", task_type="CAUSAL_LM")
     llm = BaseLLM()
     model = get_peft_model(llm.model, config)
     model.enable_input_require_grads()
     epochs = kwargs.get("epoch", 1)
     batch = kwargs.get("batch", 4)
-    args = TrainingArguments(output_dir=output_dir, logging_dir=output_dir, report_to="tensorboard", gradient_checkpointing=True, learning_rate=5e-4, num_train_epochs=epochs, per_device_train_batch_size=batch, per_device_eval_batch_size=batch, eval_strategy="steps", eval_steps=500)
+    args = TrainingArguments(output_dir=output_dir, logging_dir=output_dir, report_to="tensorboard", gradient_checkpointing=True, learning_rate=1e-4, num_train_epochs=epochs, per_device_train_batch_size=batch, per_device_eval_batch_size=batch, eval_strategy="steps", eval_steps=500)
     t_dataset = TokenizedDataset(llm.tokenizer, Dataset("train"), format_example)
     v_dataset = TokenizedDataset(llm.tokenizer, Dataset("valid"), format_example)
     training = Trainer(model,args,train_dataset=t_dataset, eval_dataset=v_dataset)
@@ -109,6 +108,7 @@ def test_model(ckpt_path: str):
     print("True response:\n",base)
     check = llm.generate(testset['query'][0])
     print("My response:\n",check)
+    #tokenize(llm.tokenizer, testset['query'][0], testset['response'][0])
 
 
 
